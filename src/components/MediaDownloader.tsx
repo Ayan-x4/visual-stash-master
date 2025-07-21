@@ -24,18 +24,21 @@ interface MediaInfo {
   views?: string;
   platform: 'youtube' | 'instagram';
   type: 'video' | 'image' | 'carousel';
-  downloadOptions: {
-    quality: string;
-    format: string;
-    size: string;
-  }[];
+  downloadOptions: DownloadOption[];
+}
+
+interface DownloadOption {
+  quality: string;
+  format: string;
+  size: string;
 }
 
 export const MediaDownloader = () => {
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [mediaInfo, setMediaInfo] = useState<MediaInfo | null>(null);
-  const [selectedOption, setSelectedOption] = useState<string>('');
+  const [selectedOption, setSelectedOption] = useState<DownloadOption | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   const { toast } = useToast();
 
   const detectPlatform = (url: string) => {
@@ -95,7 +98,7 @@ export const MediaDownloader = () => {
       };
 
       setMediaInfo(mockData);
-      setSelectedOption(mockData.downloadOptions[0].quality);
+      setSelectedOption(mockData.downloadOptions[0]);
       setIsLoading(false);
       
       toast({
@@ -107,19 +110,38 @@ export const MediaDownloader = () => {
 
   const handleDownload = () => {
     if (!selectedOption || !mediaInfo) return;
-
-    toast({
-      title: "Download started!",
-      description: `Downloading ${mediaInfo.title} in ${selectedOption} quality.`,
-    });
-
-    // Simulate download
+    
+    setIsDownloading(true);
+    
+    // Frontend-only download using external services
+    const downloadUrl = generateDownloadUrl(url, selectedOption);
+    
+    // Open download in new tab
+    window.open(downloadUrl, '_blank');
+    
     setTimeout(() => {
+      setIsDownloading(false);
       toast({
-        title: "Download complete!",
-        description: "Your file has been saved to your downloads folder.",
+        title: "Download Started!",
+        description: `Redirected to download ${selectedOption.format} file.`,
       });
-    }, 3000);
+    }, 1000);
+  };
+
+  const generateDownloadUrl = (mediaUrl: string, option: DownloadOption) => {
+    const platform = detectPlatform(mediaUrl);
+    
+    if (platform === 'youtube') {
+      // Use external YouTube downloader services
+      if (option.format === 'MP3') {
+        return `https://ytmp3.cc/en13/?q=${encodeURIComponent(mediaUrl)}`;
+      } else {
+        return `https://en.savefrom.net/?url=${encodeURIComponent(mediaUrl)}`;
+      }
+    } else {
+      // Use external Instagram downloader services
+      return `https://snapinsta.app/?url=${encodeURIComponent(mediaUrl)}`;
+    }
   };
 
   const getPlatformIcon = (platform: 'youtube' | 'instagram') => {
@@ -242,11 +264,11 @@ export const MediaDownloader = () => {
                       <div
                         key={option.quality}
                         className={`p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                          selectedOption === option.quality
+                          selectedOption?.quality === option.quality
                             ? 'border-primary bg-primary/5'
                             : 'border-border hover:border-primary/50'
                         }`}
-                        onClick={() => setSelectedOption(option.quality)}
+                        onClick={() => setSelectedOption(option)}
                       >
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-medium text-sm">{option.quality}</span>
@@ -269,11 +291,20 @@ export const MediaDownloader = () => {
             <div className="flex justify-center">
               <Button
                 onClick={handleDownload}
-                disabled={!selectedOption}
+                disabled={!selectedOption || isDownloading}
                 className="bg-gradient-primary hover:opacity-90 px-8 py-3 text-lg animate-glow"
               >
-                <Download className="w-5 h-5 mr-2" />
-                Download {selectedOption}
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Opening Download...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-5 h-5 mr-2" />
+                    Download {selectedOption?.quality}
+                  </>
+                )}
               </Button>
             </div>
           </div>
